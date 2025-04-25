@@ -3,7 +3,7 @@
     "builds": [
         {
             "src": "server/index.js",
-            "use": "@vercel/node@1.0.0" // Add the runtime version
+            "use": "@vercel/node@1.0.0"
         }
     ],
     "routes": [
