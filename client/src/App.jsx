@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import LandingPage from './components/pages/landingpage';
+import LandingPage from './components/pages/landingPage';
 import DashBoard from './components/pages/dashboard';
 import RoadmapInput from './components/roadmapForm';
 import { AuthContextProvider } from './context/authContext';
