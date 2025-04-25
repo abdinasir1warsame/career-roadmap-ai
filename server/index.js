@@ -1,28 +1,29 @@
 import express from 'express';
+import serverless from 'serverless-http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import fileUpload from 'express-fileupload';
-import roadmapRouter from './routes/roadmap.js';
-import stripeRouter from './routes/stripe.js';
-import processCvRouter from './routes/processCv.js';
-import './firebase.js'; // Initialize Firebase
+import roadmapRouter from '../routes/roadmap.js';
+import stripeRouter from '../routes/stripe.js';
+import processCvRouter from '../routes/processCv.js';
+import '../firebase.js'; // Initialize Firebase
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 // CORS Configuration
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin:
+      process.env.FRONTEND_URL || 'https://career-roadmap-ai-l7y9.vercel.app',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
 );
 
-// Stripe webhook route must come before body parsers!
+// Stripe webhook must be before JSON middleware
 app.use('/api/stripe/webhook', stripeRouter);
 
 // Other middleware
@@ -46,8 +47,8 @@ app.use('/api/roadmap', roadmapRouter);
 app.use('/api/processCv', processCvRouter);
 app.use('/api/stripe', stripeRouter);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health Check
+app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -80,25 +81,5 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`
-  � Server running in ${process.env.NODE_ENV || 'development'} mode
-  🔗 Base URL: http://localhost:${PORT}
-  📚 API Docs: http://localhost:${PORT}/api-docs
-  🩺 Health Check: http://localhost:${PORT}/health
-  `);
-});
-
-// Handle shutdowns gracefully
-process.on('unhandledRejection', (err) => {
-  console.error(`Unhandled Rejection: ${err.stack}`);
-  server.close(() => process.exit(1));
-});
-
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Process terminated');
-  });
-});
+// Export for Vercel Serverless
+export const handler = serverless(app);
