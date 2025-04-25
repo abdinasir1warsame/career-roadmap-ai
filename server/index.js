@@ -7,62 +7,60 @@ import stripeRouter from './routes/stripe.js';
 import processCvRouter from './routes/processCv.js';
 import './firebase.js'; // Initialize Firebase
 
+// 1. Initial Configuration
 dotenv.config();
-
 const app = express();
 
-// Enhanced CORS configuration
-const corsOptions = {
-  origin: [
-    'https://career-roadmap-ai-l7y9.vercel.app',
-    'http://localhost:5173',
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-};
+// 2. Security and Protocol Middleware
+app.use(
+  cors({
+    origin: [
+      'https://career-roadmap-ai-l7y9.vercel.app',
+      'http://localhost:5173',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
+app.options('*', cors()); // Preflight handling
 
-app.use(cors(corsOptions));
+// 3. Body Parsing (Must come before routes)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Stripe webhook route must come before body parsers!
+// 4. Special Case: Stripe Webhook (Raw body)
 app.use(
   '/api/stripe/webhook',
   express.raw({ type: 'application/json' }),
   stripeRouter
 );
 
-// File upload middleware with error handling
+// 5. File Uploads
 app.use(
   fileUpload({
     limits: { fileSize: 5 * 1024 * 1024 },
     abortOnLimit: true,
-    useTempFiles: true, // Recommended for Vercel
-    tempFileDir: '/tmp/', // Vercel's writable directory
+    useTempFiles: true,
+    tempFileDir: '/tmp/',
   })
 );
 
-// Body parsers
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Enhanced logging middleware
+// 6. Logging Middleware
 app.use((req, res, next) => {
-  console.log(
-    `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`,
-    {
-      headers: req.headers,
-      body: req.body,
-    }
-  );
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, {
+    headers: req.headers,
+    body: req.body,
+  });
   next();
 });
 
-// API Routes
+// 7. API Routes
 app.use('/api/roadmap', roadmapRouter);
 app.use('/api/processCv', processCvRouter);
 app.use('/api/stripe', stripeRouter);
 
-// Health check endpoint
+// 8. Health Check
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
@@ -72,7 +70,20 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 404 Handler
+// 9. Documentation Endpoint
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Career Roadmap API',
+    status: 'operational',
+    endpoints: [
+      '/api/roadmap - POST career roadmap generation',
+      '/api/processCv - POST process CV/resume',
+      '/health - GET service status',
+    ],
+  });
+});
+
+// 10. Error Handling (404 -> 500)
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -86,34 +97,26 @@ app.use((req, res) => {
   });
 });
 
-// Enhanced Error Handler
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
-  const isProduction = process.env.NODE_ENV === 'production';
-
-  console.error(`[ERROR] ${err.stack}`, {
-    url: req.originalUrl,
-    method: req.method,
-    body: req.body,
-    headers: req.headers,
-  });
-
+  console.error(`[ERROR] ${err.stack}`);
   res.status(statusCode).json({
     error: {
-      message: isProduction ? 'Something went wrong!' : err.message,
-      ...(!isProduction && {
+      message:
+        process.env.NODE_ENV === 'production'
+          ? 'Something went wrong'
+          : err.message,
+      ...(process.env.NODE_ENV !== 'production' && {
         stack: err.stack,
         details: err.details,
       }),
-      timestamp: new Date().toISOString(),
     },
   });
 });
 
-// Export for Vercel
+// 11. Server Export/Start
 export default app;
 
-// Local development server
 if (process.env.VERCEL !== '1') {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
