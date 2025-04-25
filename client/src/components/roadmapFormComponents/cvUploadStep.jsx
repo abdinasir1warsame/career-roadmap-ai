@@ -22,10 +22,13 @@ export default function CVUploadStep({
         const formDataToSend = new FormData();
         formDataToSend.append('cv', file);
 
-        const response = await fetch('http://localhost:5000/api/processCv', {
-          method: 'POST',
-          body: formDataToSend,
-        });
+        const response = await fetch(
+          'https://career-roadmap-ai-l64v-api.vercel.app/api/processCv',
+          {
+            method: 'POST',
+            body: formDataToSend,
+          }
+        );
 
         if (!response.ok) {
           throw new Error('CV processing failed');
