@@ -7,11 +7,11 @@ import stripeRouter from './routes/stripe.js';
 import processCvRouter from './routes/processCv.js';
 import './firebase.js'; // Initialize Firebase
 
-// 1. Initial Configuration
 dotenv.config();
+
 const app = express();
 
-// 2. Security and Protocol Middleware
+// In server/index.js
 app.use(
   cors({
     origin: [
@@ -23,44 +23,56 @@ app.use(
     credentials: true,
   })
 );
-app.options('*', cors()); // Preflight handling
-
-// 3. Body Parsing (Must come before routes)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// 4. Special Case: Stripe Webhook (Raw body)
+app.use((req, res, next) => {
+  console.log('Incoming Request:', {
+    method: req.method,
+    path: req.path,
+    headers: req.headers,
+    body: req.body,
+  });
+  next();
+});
+// Add preflight handling
+app.options('*', cors());
+// Stripe webhook route must come before body parsers!
 app.use(
   '/api/stripe/webhook',
   express.raw({ type: 'application/json' }),
   stripeRouter
 );
 
-// 5. File Uploads
+// File upload middleware with error handling
 app.use(
   fileUpload({
     limits: { fileSize: 5 * 1024 * 1024 },
     abortOnLimit: true,
-    useTempFiles: true,
-    tempFileDir: '/tmp/',
+    useTempFiles: true, // Recommended for Vercel
+    tempFileDir: '/tmp/', // Vercel's writable directory
   })
 );
 
-// 6. Logging Middleware
+// Body parsers
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Enhanced logging middleware
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, {
-    headers: req.headers,
-    body: req.body,
-  });
+  console.log(
+    `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`,
+    {
+      headers: req.headers,
+      body: req.body,
+    }
+  );
   next();
 });
 
-// 7. API Routes
+// API Routes
 app.use('/api/roadmap', roadmapRouter);
 app.use('/api/processCv', processCvRouter);
 app.use('/api/stripe', stripeRouter);
 
-// 8. Health Check
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
@@ -70,20 +82,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 9. Documentation Endpoint
-app.get('/', (req, res) => {
-  res.json({
-    service: 'Career Roadmap API',
-    status: 'operational',
-    endpoints: [
-      '/api/roadmap - POST career roadmap generation',
-      '/api/processCv - POST process CV/resume',
-      '/health - GET service status',
-    ],
-  });
-});
-
-// 10. Error Handling (404 -> 500)
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -97,26 +96,34 @@ app.use((req, res) => {
   });
 });
 
+// Enhanced Error Handler
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
-  console.error(`[ERROR] ${err.stack}`);
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  console.error(`[ERROR] ${err.stack}`, {
+    url: req.originalUrl,
+    method: req.method,
+    body: req.body,
+    headers: req.headers,
+  });
+
   res.status(statusCode).json({
     error: {
-      message:
-        process.env.NODE_ENV === 'production'
-          ? 'Something went wrong'
-          : err.message,
-      ...(process.env.NODE_ENV !== 'production' && {
+      message: isProduction ? 'Something went wrong!' : err.message,
+      ...(!isProduction && {
         stack: err.stack,
         details: err.details,
       }),
+      timestamp: new Date().toISOString(),
     },
   });
 });
 
-// 11. Server Export/Start
+// Export for Vercel
 export default app;
 
+// Local development server
 if (process.env.VERCEL !== '1') {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
