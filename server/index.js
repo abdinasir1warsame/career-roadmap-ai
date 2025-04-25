@@ -11,29 +11,19 @@ dotenv.config();
 
 const app = express();
 
-// In server/index.js
-app.use(
-  cors({
-    origin: [
-      'https://career-roadmap-ai-l7y9.vercel.app',
-      'http://localhost:5173',
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  })
-);
-app.use((req, res, next) => {
-  console.log('Incoming Request:', {
-    method: req.method,
-    path: req.path,
-    headers: req.headers,
-    body: req.body,
-  });
-  next();
-});
-// Add preflight handling
-app.options('*', cors());
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: [
+    'https://career-roadmap-ai-l7y9.vercel.app',
+    'http://localhost:5173',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
 // Stripe webhook route must come before body parsers!
 app.use(
   '/api/stripe/webhook',
